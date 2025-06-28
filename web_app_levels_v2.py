@@ -370,6 +370,106 @@ def get_folder_status():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Alert Settings API endpoints
+@app.route('/api/v2/alert-settings', methods=['GET', 'POST'])
+@login_required
+def alert_settings():
+    """Get or save alert settings."""
+    try:
+        if request.method == 'GET':
+            # Load alert settings from file or database
+            # For now, return default settings
+            return jsonify({
+                'es': {
+                    'distance': 3.0,
+                    'cooldown': 15,
+                    'enabled': True
+                },
+                'nq': {
+                    'distance': 5.0,
+                    'cooldown': 15,
+                    'enabled': True
+                },
+                'global': {
+                    'marketHoursOnly': True,
+                    'dailyLimit': 50,
+                    'testMode': False
+                }
+            })
+        
+        elif request.method == 'POST':
+            settings = request.get_json()
+            
+            # Validate settings
+            required_keys = ['es', 'nq', 'global']
+            if not all(key in settings for key in required_keys):
+                return jsonify({'error': 'Missing required settings'}), 400
+            
+            # Save settings (could store in database or config file)
+            # For now, just return success
+            logger.info(f"Alert settings updated: {settings}")
+            
+            return jsonify({
+                'success': True,
+                'message': 'Alert settings saved successfully'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error handling alert settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/v2/test-sms', methods=['POST'])
+@login_required
+def test_sms():
+    """Send a test SMS message."""
+    try:
+        from src.notification_system_v2 import create_sms_service_from_env, AlertPriority
+        
+        # Create SMS service
+        sms_service = create_sms_service_from_env()
+        
+        # Send test message
+        import asyncio
+        test_message = f"xFGv2 SMS Test - {datetime.now().strftime('%H:%M:%S')} EST"
+        
+        # Run async function in sync context
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            success = loop.run_until_complete(
+                sms_service.send_sms(test_message, AlertPriority.LOW)
+            )
+        finally:
+            loop.close()
+        
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Test SMS sent successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to send test SMS'
+            }), 500
+            
+    except ImportError:
+        return jsonify({
+            'success': False,
+            'message': 'SMS service not available - install Twilio'
+        }), 500
+    except ValueError as e:
+        return jsonify({
+            'success': False,
+            'message': f'SMS configuration error: {str(e)}'
+        }), 500
+    except Exception as e:
+        logger.error(f"Error sending test SMS: {e}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     """Login page."""

@@ -180,9 +180,9 @@ class MotiveWaveCSVImporter:
             'MGI: PDM': ('mgi_pdm', LevelPriority.STANDARD),
             'MGI: PDL': ('mgi_pdl', LevelPriority.STANDARD),
             'MGI: PRTH Close': ('mgi_prth_close', LevelPriority.STANDARD),
-            'Balance Area High': ('balance_area_high', LevelPriority.STANDARD),
-            'Balance Area Mid': ('balance_area_mid', LevelPriority.STANDARD),
-            'Balance Area Low': ('balance_area_low', LevelPriority.STANDARD),
+            'Balance Area High': ('balance_area_high', LevelPriority.ALL_STAR),
+            'Balance Area Mid': ('balance_area_mid', LevelPriority.ALL_STAR),
+            'Balance Area Low': ('balance_area_low', LevelPriority.ALL_STAR),
             
             # Reference priority levels
             'MGI: IB+200%': ('mgi_ib_plus_200', LevelPriority.REFERENCE),

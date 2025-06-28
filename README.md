@@ -106,7 +106,7 @@ xfgv2/
 - **File Archiving**: Organizes processed files automatically
 
 ### **Priority-Based Level System**
-- **⭐ ALL-STAR**: 26 highest priority levels (7 CSV + 6 manual per symbol)
+- **⭐ ALL-STAR**: 32 highest priority levels (10 CSV + 6 manual per symbol)
 - **📊 STANDARD**: Regular trading levels for context
 - **📋 REFERENCE**: Extended targets and analysis levels
 
@@ -125,11 +125,11 @@ xfgv2/
 ## 📊 Level Types Scanned
 
 ### **CSV Levels (34 per symbol)**
-**⭐ ALL-STAR (7):**
-- Week Open, Previous Month VAH/VAL, Previous Week VAH/VAL, Overnight High/Low
+**⭐ ALL-STAR (10):**
+- Week Open, Previous Month VAH/VAL, Previous Week VAH/VAL, Overnight High/Low, Balance Area High/Mid/Low
 
-**📊 STANDARD (10):**
-- Month Open, Previous Month levels, Previous Week levels, Daily levels, Balance Area
+**📊 STANDARD (7):**
+- Month Open, Previous Month levels, Previous Week levels, Daily levels
 
 **📋 REFERENCE (11):**
 - Initial Balance extensions (+/-200%, +/-150%, +/-100%, +/-50%, etc.)
