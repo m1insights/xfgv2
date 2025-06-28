@@ -2,8 +2,9 @@ services:
   - type: web
     name: xfgv2
     env: python
+    runtime: python-3.11.8
     buildCommand: pip install -r requirements.txt
-    startCommand: python web_app_simple.py
+    startCommand: python start.py
     plan: free
     healthCheckPath: /health
     envVars:

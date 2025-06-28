@@ -4,11 +4,35 @@ Minimal version without database dependencies for initial deployment.
 """
 
 import os
+import sys
 import logging
 from datetime import datetime, time
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required
-from werkzeug.security import check_password_hash, generate_password_hash
+
+# Print debug info for deployment
+print(f"🐍 Python version: {sys.version}")
+print(f"📁 Working directory: {os.getcwd()}")
+print(f"📦 Available packages:")
+
+try:
+    from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
+    print("✅ Flask imported successfully")
+except ImportError as e:
+    print(f"❌ Flask import failed: {e}")
+    sys.exit(1)
+
+try:
+    from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required
+    print("✅ Flask-Login imported successfully")
+except ImportError as e:
+    print(f"❌ Flask-Login import failed: {e}")
+    sys.exit(1)
+
+try:
+    from werkzeug.security import check_password_hash, generate_password_hash
+    print("✅ Werkzeug security imported successfully")
+except ImportError as e:
+    print(f"❌ Werkzeug import failed: {e}")
+    sys.exit(1)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -99,7 +123,17 @@ def levels_dashboard():
         'nq_levels': {}
     }
     
-    return render_template('levels_v2.html', **template_data)
+    try:
+        return render_template('levels_v2.html', **template_data)
+    except Exception as e:
+        # Fallback if template not found
+        logger.warning(f"Template error: {e}")
+        return jsonify({
+            'status': 'xFGv2 Simple Mode Active',
+            'message': 'Dashboard template not available in simple mode',
+            'data': template_data,
+            'timestamp': current_time.isoformat()
+        })
 
 @app.route('/api/v2/manual-levels', methods=['POST'])
 @login_required
@@ -223,9 +257,27 @@ def login():
             next_page = request.args.get('next')
             return redirect(next_page or url_for('levels_dashboard'))
         
-        flash('Invalid username or password', 'danger')
+        return jsonify({'error': 'Invalid username or password'}), 401
     
-    return render_template('login_simple.html')
+    try:
+        return render_template('login_simple.html')
+    except Exception as e:
+        # Fallback login for simple mode
+        logger.warning(f"Login template error: {e}")
+        return f"""
+        <html>
+        <head><title>xFGv2 Login</title></head>
+        <body style="font-family: Arial; padding: 20px;">
+        <h2>xFGv2 Simple Login</h2>
+        <form method="post">
+            <p>Username: <input type="text" name="username" value="admin"></p>
+            <p>Password: <input type="password" name="password" value="password"></p>
+            <p><input type="submit" value="Login"></p>
+        </form>
+        <p><small>Default: admin / password</small></p>
+        </body>
+        </html>
+        """
 
 @app.route('/logout')
 @login_required
