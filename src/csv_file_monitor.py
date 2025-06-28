@@ -128,7 +128,7 @@ class CSVFileMonitor:
                 }
             
             # Check for at least some MGI columns
-            mgi_columns = [col for col in df.columns if col.startswith('MGI')]
+            mgi_columns = [col for col in rows[0].keys() if col.startswith('MGI')]
             if len(mgi_columns) < 5:
                 return {
                     'valid': False,
@@ -136,7 +136,7 @@ class CSVFileMonitor:
                 }
             
             # Check for Balance Area columns
-            balance_area_columns = [col for col in df.columns if 'Balance Area' in col]
+            balance_area_columns = [col for col in rows[0].keys() if 'Balance Area' in col]
             if len(balance_area_columns) < 2:
                 return {
                     'valid': False,
@@ -145,7 +145,8 @@ class CSVFileMonitor:
             
             # Try to parse datetime
             try:
-                pd.to_datetime(df[datetime_col].iloc[0], format='%d/%m/%Y %H:%M:%S')
+                from datetime import datetime
+                datetime.strptime(rows[0][datetime_col], '%d/%m/%Y %H:%M:%S')
             except Exception as e:
                 return {
                     'valid': False,

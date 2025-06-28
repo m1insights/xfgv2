@@ -16,8 +16,7 @@ psycopg2-binary==2.9.7
 schedule==1.2.0
 watchdog==3.0.0
 
-# Data processing
-pandas>=2.1.0,<2.2.0
+# Data processing (using built-in csv module instead of pandas)
 
 # Data validation
 pydantic==2.8.2

@@ -10,11 +10,8 @@ import json
 from datetime import datetime, date, time, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
-try:
-    import pandas as pd
-    PANDAS_AVAILABLE = True
-except ImportError:
-    PANDAS_AVAILABLE = False
+import csv
+PANDAS_AVAILABLE = True  # Using csv module instead
 from dataclasses import dataclass
 from pathlib import Path
 import pytz
@@ -216,39 +213,51 @@ class MotiveWaveCSVImporter:
         
         We scan rows to find today's date with time >= 9:30am EST.
         """
-        if not PANDAS_AVAILABLE:
-            return {
-                'success': False,
-                'error': 'Pandas not available - CSV parsing disabled for deployment',
-                'levels_found': {},
-                'trading_date': None,
-                'data_timestamp': None
-            }
+        # CSV parsing always available with built-in csv module
         
         try:
-            # Read CSV with proper date parsing
-            df = pd.read_csv(csv_file_path)
+            # Read CSV file
+            with open(csv_file_path, 'r', encoding='utf-8') as csvfile:
+                # Detect dialect
+                sample = csvfile.read(1024)
+                csvfile.seek(0)
+                sniffer = csv.Sniffer()
+                dialect = sniffer.sniff(sample)
+                
+                reader = csv.DictReader(csvfile, dialect=dialect)
+                rows = list(reader)
+            
+            if not rows:
+                raise ValueError("CSV file is empty")
             
             # Check if Date/Time column exists
             datetime_col = None
             for col in ['Date/Time', 'DateTime', 'Time', 'Date']:
-                if col in df.columns:
+                if col in rows[0].keys():
                     datetime_col = col
                     break
             
             if not datetime_col:
                 raise ValueError("No Date/Time column found in CSV")
             
-            # Parse datetime column
-            df[datetime_col] = pd.to_datetime(df[datetime_col], format='%d/%m/%Y %H:%M:%S')
-            
             # Get today's date
             today = date.today()
             
-            # Filter for today's data
-            today_data = df[df[datetime_col].dt.date == today].copy()
+            # Filter for today's data and parse datetime
+            today_rows = []
+            for row in rows:
+                try:
+                    # Parse datetime string
+                    dt_str = row[datetime_col]
+                    if dt_str:
+                        dt = datetime.strptime(dt_str, '%d/%m/%Y %H:%M:%S')
+                        if dt.date() == today:
+                            row['_parsed_datetime'] = dt
+                            today_rows.append(row)
+                except (ValueError, TypeError):
+                    continue
             
-            if today_data.empty:
+            if not today_rows:
                 return {
                     'success': False,
                     'error': f"No data found for today ({today})",
@@ -257,9 +266,12 @@ class MotiveWaveCSVImporter:
             
             # Filter for times >= 9:30 AM EST
             market_open_time = time(9, 30)
-            today_data = today_data[today_data[datetime_col].dt.time >= market_open_time]
+            filtered_rows = []
+            for row in today_rows:
+                if row['_parsed_datetime'].time() >= market_open_time:
+                    filtered_rows.append(row)
             
-            if today_data.empty:
+            if not filtered_rows:
                 return {
                     'success': False,
                     'error': f"No data found for today after 9:30 AM",
@@ -267,19 +279,19 @@ class MotiveWaveCSVImporter:
                 }
             
             # Get the first row that meets our criteria (earliest time >= 9:30)
-            target_row = today_data.iloc[0]
+            target_row = min(filtered_rows, key=lambda x: x['_parsed_datetime'])
             
             # Extract levels from MGI columns and Balance Area columns
             levels_data = []
-            trading_date = target_row[datetime_col].date()
+            trading_date = target_row['_parsed_datetime'].date()
             
             for csv_col, (level_type, priority) in self.column_mapping.items():
-                if csv_col in df.columns:
+                if csv_col in target_row:
                     try:
                         value = target_row[csv_col]
                         
                         # Skip empty/null values
-                        if pd.isna(value) or value == '' or value == 0:
+                        if not value or value == '' or value == '0' or value == 0:
                             continue
                         
                         price = float(value)
