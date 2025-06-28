@@ -4,7 +4,7 @@ services:
     env: python
     runtime: python-3.11.8
     buildCommand: pip install -r requirements.txt
-    startCommand: python start.py
+    startCommand: python web_app_levels_v2.py
     plan: free
     healthCheckPath: /health
     envVars:
@@ -29,4 +29,29 @@ services:
       - key: TWILIO_FROM_PHONE
         sync: false
       - key: TWILIO_TO_PHONE
+        sync: false
+      - key: WEB_USERNAME
+        sync: false
+      - key: WEB_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+
+  - type: worker
+    name: xfgv2-rithmic
+    env: python
+    runtime: python-3.11.8
+    buildCommand: pip install -r requirements.txt
+    startCommand: python rithmic_service.py
+    plan: free
+    envVars:
+      - key: RITHMIC_USERNAME
+        sync: false
+      - key: RITHMIC_PASSWORD
+        sync: false
+      - key: RITHMIC_SYSTEM_NAME
+        sync: false
+      - key: RITHMIC_URI
+        sync: false
+      - key: RITHMIC_ENVIRONMENT
         sync: false

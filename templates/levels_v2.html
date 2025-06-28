@@ -343,6 +343,85 @@
             </div>
         </div>
 
+        <!-- CSV File Upload -->
+        <div class="card-bg rounded-lg p-6 mb-8">
+            <h3 class="text-xl font-bold mb-4 text-green-400">📁 CSV File Upload</h3>
+            <div class="space-y-4">
+                <p class="text-gray-300">Upload your MotiveWave CSV exports (ES_levels.csv or NQ_levels.csv)</p>
+                
+                <!-- File Upload Form -->
+                <div class="border-2 border-dashed border-gray-600 rounded-lg p-6">
+                    <input type="file" 
+                           id="csvFileInput" 
+                           accept=".csv"
+                           multiple
+                           @change="handleFileSelect($event)"
+                           class="hidden">
+                    
+                    <div class="text-center">
+                        <div class="mb-4">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
+                        <div class="text-sm text-gray-300">
+                            <label for="csvFileInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-medium">
+                                Choose CSV Files
+                            </label>
+                            <p class="mt-1">or drag and drop</p>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-2">CSV files only (ES_levels.csv, NQ_levels.csv)</p>
+                    </div>
+                </div>
+
+                <!-- Selected Files Display -->
+                <div x-show="selectedFiles.length > 0" class="space-y-2">
+                    <h4 class="font-medium">Selected Files:</h4>
+                    <template x-for="file in selectedFiles" :key="file.name">
+                        <div class="flex items-center justify-between bg-gray-700 p-3 rounded">
+                            <div>
+                                <span class="font-medium" x-text="file.name"></span>
+                                <span class="text-sm text-gray-400 ml-2" x-text="formatFileSize(file.size)"></span>
+                            </div>
+                            <button @click="removeFile(file)" class="text-red-400 hover:text-red-300">
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Upload Button -->
+                <div x-show="selectedFiles.length > 0" class="flex items-center space-x-4">
+                    <button @click="uploadCSVFiles()" 
+                            :disabled="isUploading"
+                            class="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-6 py-2 rounded font-medium">
+                        <span x-show="!isUploading">📤 Upload CSV Files</span>
+                        <span x-show="isUploading">Uploading...</span>
+                    </button>
+                    <button @click="clearSelectedFiles()" 
+                            class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded">
+                        Clear
+                    </button>
+                </div>
+
+                <!-- Upload Progress -->
+                <div x-show="uploadProgress.length > 0" class="space-y-2">
+                    <h4 class="font-medium">Upload Progress:</h4>
+                    <template x-for="progress in uploadProgress" :key="progress.fileName">
+                        <div class="bg-gray-700 p-3 rounded">
+                            <div class="flex justify-between items-center mb-2">
+                                <span x-text="progress.fileName"></span>
+                                <span x-text="progress.status" :class="progress.success ? 'text-green-400' : 'text-red-400'"></span>
+                            </div>
+                            <div x-show="progress.message" class="text-sm text-gray-400" x-text="progress.message"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
         <!-- Actions -->
         <div class="card-bg rounded-lg p-6">
             <h3 class="text-xl font-bold mb-4">Actions</h3>
@@ -353,7 +432,7 @@
                 </button>
                 <button @click="triggerCSVImport()" 
                         class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
-                    Import CSV Files
+                    Scan Server CSV Files
                 </button>
                 <button @click="showScanReference()" 
                         class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">
@@ -421,6 +500,12 @@
                     }
                 },
                 isSavingAlerts: false,
+
+                // File Upload State
+                selectedFiles: [],
+                uploadProgress: 0,
+                isUploading: false,
+                uploadResults: [],
 
                 // Initialize
                 init() {
@@ -655,6 +740,83 @@
                         }
                     } catch (error) {
                         console.log('Could not load alert settings, using defaults');
+                    }
+                },
+
+                // File Upload Methods
+                handleFileSelect(event) {
+                    const files = Array.from(event.target.files);
+                    this.selectedFiles = [...this.selectedFiles, ...files];
+                },
+
+                handleDrop(event) {
+                    event.preventDefault();
+                    const files = Array.from(event.dataTransfer.files);
+                    const csvFiles = files.filter(file => file.type === 'text/csv' || file.name.toLowerCase().endsWith('.csv'));
+                    this.selectedFiles = [...this.selectedFiles, ...csvFiles];
+                },
+
+                handleDragOver(event) {
+                    event.preventDefault();
+                },
+
+                removeFile(index) {
+                    this.selectedFiles.splice(index, 1);
+                },
+
+                formatFileSize(bytes) {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                },
+
+                async uploadFiles() {
+                    if (this.selectedFiles.length === 0) {
+                        this.showMessage('No files selected', 'error');
+                        return;
+                    }
+
+                    this.isUploading = true;
+                    this.uploadProgress = 0;
+                    this.uploadResults = [];
+
+                    try {
+                        const formData = new FormData();
+                        this.selectedFiles.forEach((file, index) => {
+                            formData.append('files', file);
+                        });
+
+                        const response = await fetch('/api/v2/upload-csv', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const result = await response.json();
+
+                        if (result.success) {
+                            this.uploadResults = result.results;
+                            this.showMessage(
+                                `Upload completed: ${result.successful_files}/${result.total_files} files processed successfully`, 
+                                'success'
+                            );
+                            
+                            // Clear selected files on success
+                            this.selectedFiles = [];
+                            
+                            // Refresh data to show newly imported levels
+                            await this.refreshData();
+                        } else {
+                            this.uploadResults = result.results || [];
+                            this.showMessage(`Upload failed: ${result.error || 'Unknown error'}`, 'error');
+                        }
+
+                    } catch (error) {
+                        this.showMessage('Upload error: ' + error.message, 'error');
+                    } finally {
+                        this.isUploading = false;
+                        this.uploadProgress = 0;
                     }
                 },
 

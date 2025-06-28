@@ -4,6 +4,7 @@ Provides manual input for pivot levels and monitoring of CSV imports.
 """
 
 from flask import Flask, render_template, request, jsonify, flash, redirect, url_for
+from werkzeug.utils import secure_filename
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
@@ -38,6 +39,15 @@ except ImportError as e:
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+
+# File upload configuration
+UPLOAD_FOLDER = '/tmp/csv_uploads'
+ALLOWED_EXTENSIONS = {'csv'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+
+# Ensure upload folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Timezone is set above in the import block
 
@@ -96,6 +106,11 @@ def load_user(username):
         return User(username)
     return None
 
+def allowed_file(filename):
+    """Check if uploaded file has allowed extension."""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def get_current_est_time():
     """Get current time in EST."""
     return datetime.now(EST)
@@ -111,6 +126,17 @@ def is_market_hours():
     market_start = time(9, 0)
     market_end = time(16, 0)
     return market_start <= current_time.time() <= market_end
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render."""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'version': 'xFGv2',
+        'database_available': levels_manager is not None,
+        'csv_monitor_available': csv_monitor is not None
+    })
 
 @app.route('/')
 @app.route('/levels')
@@ -491,6 +517,110 @@ def test_sms():
             'success': False,
             'message': f'Error: {str(e)}'
         }), 500
+
+@app.route('/api/v2/upload-csv', methods=['POST'])
+@login_required
+def upload_csv():
+    """Handle CSV file upload from MotiveWave."""
+    try:
+        # Check if files were uploaded
+        if 'files' not in request.files:
+            return jsonify({'error': 'No files provided'}), 400
+        
+        files = request.files.getlist('files')
+        if not files or all(file.filename == '' for file in files):
+            return jsonify({'error': 'No files selected'}), 400
+        
+        results = []
+        
+        for file in files:
+            if file and file.filename != '':
+                # Validate file type
+                if not allowed_file(file.filename):
+                    results.append({
+                        'filename': file.filename,
+                        'success': False,
+                        'error': 'Invalid file type. Only CSV files are allowed.'
+                    })
+                    continue
+                
+                # Secure filename
+                filename = secure_filename(file.filename)
+                if not filename:
+                    results.append({
+                        'filename': file.filename,
+                        'success': False,
+                        'error': 'Invalid filename'
+                    })
+                    continue
+                
+                # Save file to upload folder
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                
+                # Process the CSV file if levels manager is available
+                if levels_manager:
+                    try:
+                        # Determine symbol from filename
+                        symbol = None
+                        filename_upper = filename.upper()
+                        if 'ES' in filename_upper:
+                            symbol = 'ES'
+                        elif 'NQ' in filename_upper:
+                            symbol = 'NQ'
+                        
+                        if symbol:
+                            # Import CSV using the levels manager
+                            import_result = levels_manager.import_csv_file(
+                                file_path, 
+                                symbol, 
+                                date.today(),
+                                user=current_user.id
+                            )
+                            
+                            results.append({
+                                'filename': filename,
+                                'success': import_result['success'],
+                                'symbol': symbol,
+                                'imported_count': import_result.get('imported_count', 0),
+                                'message': import_result.get('message', 'Imported successfully')
+                            })
+                            
+                            # Clean up uploaded file after successful import
+                            os.remove(file_path)
+                        else:
+                            results.append({
+                                'filename': filename,
+                                'success': False,
+                                'error': 'Could not determine symbol from filename. Include ES or NQ in filename.'
+                            })
+                    except Exception as e:
+                        results.append({
+                            'filename': filename,
+                            'success': False,
+                            'error': f'Processing error: {str(e)}'
+                        })
+                else:
+                    # No levels manager available - just save file
+                    results.append({
+                        'filename': filename,
+                        'success': True,
+                        'message': 'File uploaded successfully (database not available for processing)'
+                    })
+        
+        # Summary response
+        total_files = len(results)
+        successful_files = sum(1 for r in results if r['success'])
+        
+        return jsonify({
+            'success': successful_files > 0,
+            'total_files': total_files,
+            'successful_files': successful_files,
+            'results': results
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Upload error: {str(e)}'}), 500
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
