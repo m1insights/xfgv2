@@ -86,6 +86,9 @@ class RithmicClientExact:
         self.callbacks = {
             'market_data': {},
         }
+        
+        # Price update callback for alerts
+        self.price_callback = None
     
     async def connect(self) -> bool:
         """Connect to Rithmic server (EXACT copy of working method)."""
@@ -321,6 +324,13 @@ class RithmicClientExact:
             # Update current price (EXACT copy)
             self.current_prices[symbol] = price
             
+            # Call price callback if registered (for alerts)
+            if self.price_callback:
+                try:
+                    self.price_callback(symbol, price)
+                except Exception as e:
+                    logger.error(f"Price callback error: {e}")
+            
             # Determine trade side based on bid/ask (EXACT copy)
             trade_side = 'unknown'
             bid_price = self.bid_prices.get(symbol, 0)
@@ -462,6 +472,12 @@ class RithmicClientExact:
         """Add a callback for market data updates."""
         self.callbacks['market_data'][symbol] = callback
         logger.debug(f"Added market data callback for {symbol}")
+
+
+    def set_price_callback(self, callback: Callable[[str, float], None]):
+        """Set callback function to be called when price updates."""
+        self.price_callback = callback
+        logger.info("Price callback registered for alert system")
 
 
 # Factory function using environment variables (matching old system pattern)

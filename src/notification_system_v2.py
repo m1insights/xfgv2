@@ -6,11 +6,20 @@ Sends text message alerts when price approaches prioritized structural levels.
 import asyncio
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from typing import Dict, List, Optional, Callable, Any
 from dataclasses import dataclass
 from enum import Enum
 import json
+
+# Timezone support
+try:
+    import pytz
+    EST = pytz.timezone('America/New_York')
+    TIMEZONE_AVAILABLE = True
+except ImportError:
+    EST = None
+    TIMEZONE_AVAILABLE = False
 
 # SMS service imports
 try:
@@ -21,6 +30,31 @@ except ImportError:
     logging.warning("Twilio not installed. Install with: pip install twilio")
 
 logger = logging.getLogger(__name__)
+
+
+def is_market_hours() -> bool:
+    """Check if current time is within SMS alert hours (9:30 AM - 3:30 PM EST)."""
+    if not TIMEZONE_AVAILABLE:
+        # Fallback: assume we're always in market hours if timezone isn't available
+        return True
+    
+    try:
+        current_time = datetime.now(EST)
+        current_time_only = current_time.time()
+        
+        # Market hours: 9:30 AM to 3:30 PM EST
+        market_start = time(9, 30)  # 9:30 AM
+        market_end = time(15, 30)   # 3:30 PM
+        
+        # Check if current time is within market hours
+        is_weekday = current_time.weekday() < 5  # Monday = 0, Friday = 4
+        is_in_hours = market_start <= current_time_only <= market_end
+        
+        return is_weekday and is_in_hours
+        
+    except Exception as e:
+        logger.warning(f"Could not determine market hours: {e}, defaulting to True")
+        return True
 
 
 class AlertPriority(Enum):
@@ -345,6 +379,12 @@ class AlertEngine:
     async def _send_alert(self, alert: Alert) -> bool:
         """Send an alert via SMS."""
         try:
+            # Check if we're in market hours (9:30 AM - 3:30 PM EST)
+            if not is_market_hours():
+                logger.info(f"Alert suppressed (outside market hours 9:30-15:30 EST): {alert.message}")
+                self.stats['alerts_suppressed'] += 1
+                return False
+            
             success = await self.sms_service.send_sms(alert.message, alert.priority)
             
             if success:

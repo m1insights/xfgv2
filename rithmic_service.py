@@ -54,18 +54,67 @@ async def main():
         sys.exit(1)
     
     try:
-        # Import Rithmic client
-        from src.rithmic_client_exact import RithmicClientExact
-        logger.info("✅ Rithmic client imported successfully")
+        # Import required components
+        from src.rithmic_client_exact import create_rithmic_client_exact_from_env
+        from src.notification_system_v2 import create_personal_alert_engine
+        from src.structural_levels_v2 import StructuralLevelsManagerV2
         
-        # Create client instance
-        client = RithmicClientExact()
+        logger.info("✅ Components imported successfully")
+        
+        # Initialize database connection for levels
+        database_url = os.getenv('DATABASE_URL', '')
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        
+        levels_manager = None
+        alert_engine = None
+        
+        # Try to initialize levels manager and alert engine
+        try:
+            if database_url:
+                levels_manager = StructuralLevelsManagerV2(database_url)
+                logger.info("✅ Structural levels manager initialized")
+                
+                # Create alert engine
+                alert_engine = create_personal_alert_engine()
+                logger.info("✅ Alert engine initialized")
+                
+                # Load today's ALL-STAR levels
+                from datetime import date
+                today = date.today()
+                
+                for symbol in ['ES', 'NQ']:
+                    levels = levels_manager.get_all_star_levels(symbol, today)
+                    alert_engine.add_structural_levels(symbol, levels)
+                    logger.info(f"✅ Loaded {len(levels)} ALL-STAR levels for {symbol}")
+                
+                # Start alert monitoring
+                await alert_engine.start_monitoring()
+                logger.info("🚨 Alert monitoring started")
+            else:
+                logger.warning("⚠️ No database URL - running without alerts")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not initialize alerts: {e}")
+        
+        # Create Rithmic client
+        client = create_rithmic_client_exact_from_env()
         logger.info("✅ Rithmic client created")
         
         # Connect to Rithmic
         logger.info("🔌 Connecting to Rithmic...")
         await client.connect()
         logger.info("✅ Connected to Rithmic successfully")
+        
+        # Set up price update callback for alerts
+        if alert_engine:
+            def price_callback(symbol: str, price: float):
+                """Callback to update alert engine with new prices."""
+                alert_engine.update_price(symbol, price)
+                logger.debug(f"📊 {symbol}: ${price:.2f}")
+            
+            # Register callback with client
+            client.set_price_callback(price_callback)
+            logger.info("🔗 Price alerts connected to market data")
         
         # Subscribe to market data
         symbols = ['ES', 'NQ']
@@ -76,11 +125,19 @@ async def main():
         
         logger.info("🎯 Market data service running...")
         logger.info("📈 Receiving live price data for ES and NQ")
+        if alert_engine:
+            logger.info("🚨 SMS alerts active for ALL-STAR levels (9:30-15:30 EST)")
         
         # Keep the service running
         while True:
-            await asyncio.sleep(10)
-            logger.info(f"⏰ Service healthy - {datetime.now().strftime('%H:%M:%S')} EST")
+            await asyncio.sleep(30)
+            current_time = datetime.now().strftime('%H:%M:%S')
+            
+            if alert_engine:
+                stats = alert_engine.get_statistics()
+                logger.info(f"⏰ {current_time} EST | Alerts sent: {stats['alerts_sent']} | Suppressed: {stats['alerts_suppressed']}")
+            else:
+                logger.info(f"⏰ Service healthy - {current_time} EST")
             
     except ImportError as e:
         logger.error(f"❌ Failed to import Rithmic client: {e}")
