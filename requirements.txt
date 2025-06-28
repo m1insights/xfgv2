@@ -2,23 +2,12 @@
 flask==3.0.0
 werkzeug==3.0.1
 
-# Database
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-
 # Authentication
 flask-login==0.6.3
 
-# Data Processing (temporarily removed pandas for deployment)
-# pandas==2.1.4
-numpy==1.26.2
-
-# Market Data & Notifications
-websockets==12.0
+# Notifications
 twilio==8.11.0
-protobuf==4.25.1
 
 # Utilities
 python-dotenv==1.0.0
-pytz==2023.3
 requests==2.31.0

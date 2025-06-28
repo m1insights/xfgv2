@@ -3,7 +3,7 @@ services:
     name: xfgv2
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python web_app_levels_v2.py
+    startCommand: python web_app_simple.py
     plan: free
     healthCheckPath: /health
     envVars:
