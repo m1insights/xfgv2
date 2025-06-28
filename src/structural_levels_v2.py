@@ -10,7 +10,11 @@ import json
 from datetime import datetime, date, time, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
-import pandas as pd
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
 from dataclasses import dataclass
 from pathlib import Path
 import pytz
@@ -212,6 +216,15 @@ class MotiveWaveCSVImporter:
         
         We scan rows to find today's date with time >= 9:30am EST.
         """
+        if not PANDAS_AVAILABLE:
+            return {
+                'success': False,
+                'error': 'Pandas not available - CSV parsing disabled for deployment',
+                'levels_found': {},
+                'trading_date': None,
+                'data_timestamp': None
+            }
+        
         try:
             # Read CSV with proper date parsing
             df = pd.read_csv(csv_file_path)

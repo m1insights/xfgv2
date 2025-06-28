@@ -9,8 +9,8 @@ psycopg2-binary==2.9.9
 # Authentication
 flask-login==0.6.3
 
-# Data Processing
-pandas==2.1.4
+# Data Processing (temporarily removed pandas for deployment)
+# pandas==2.1.4
 numpy==1.26.2
 
 # Market Data & Notifications
