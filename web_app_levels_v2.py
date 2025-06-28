@@ -11,21 +11,35 @@ import json
 from datetime import datetime, date, time, timedelta
 import secrets
 from dotenv import load_dotenv
-import pytz
+try:
+    import pytz
+    PYTZ_AVAILABLE = True
+    EST = pytz.timezone('America/New_York')
+except ImportError:
+    PYTZ_AVAILABLE = False
+    EST = None
+    print("⚠️ pytz not available - timezone features disabled")
+
 from typing import Dict, Any, List
 
 # Load environment variables
 load_dotenv()
 
-# Import our new levels manager
-from src.structural_levels_v2 import StructuralLevelsManagerV2, LevelValidation
-from src.csv_file_monitor import CSVFileMonitor, MonitorConfig
+# Try to import database features, fallback to simple mode if unavailable
+try:
+    from src.structural_levels_v2 import StructuralLevelsManagerV2, LevelValidation
+    from src.csv_file_monitor import CSVFileMonitor, MonitorConfig
+    FULL_FEATURES_AVAILABLE = True
+    print("✅ Full database features available")
+except ImportError as e:
+    FULL_FEATURES_AVAILABLE = False
+    print(f"⚠️ Database features unavailable: {e}")
+    print("🔄 Running in simple mode")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 
-# Set timezone
-EST = pytz.timezone('America/New_York')
+# Timezone is set above in the import block
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -38,25 +52,33 @@ if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
 # Initialize levels manager with error handling
-try:
-    levels_manager = StructuralLevelsManagerV2(DATABASE_URL)
-    # Try to create tables if they don't exist
-    levels_manager.create_tables()
-except Exception as e:
-    print(f"Warning: Could not initialize database: {e}")
-    levels_manager = None
+levels_manager = None
+csv_monitor = None
 
-# Initialize CSV monitor with error handling
-try:
-    monitor_config = MonitorConfig(
-        database_url=DATABASE_URL,
-        watch_folder=os.environ.get('CSV_WATCH_FOLDER', '/tmp/csv_watch'),
-        allowed_symbols=['ES', 'NQ']
-    )
-    csv_monitor = CSVFileMonitor(monitor_config) if levels_manager else None
-except Exception as e:
-    print(f"Warning: Could not initialize CSV monitor: {e}")
-    csv_monitor = None
+if FULL_FEATURES_AVAILABLE:
+    try:
+        levels_manager = StructuralLevelsManagerV2(DATABASE_URL)
+        # Try to create tables if they don't exist
+        levels_manager.create_tables()
+        print("✅ Database initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Could not initialize database: {e}")
+        levels_manager = None
+
+    # Initialize CSV monitor with error handling
+    try:
+        monitor_config = MonitorConfig(
+            database_url=DATABASE_URL,
+            watch_folder=os.environ.get('CSV_WATCH_FOLDER', '/tmp/csv_watch'),
+            allowed_symbols=['ES', 'NQ']
+        )
+        csv_monitor = CSVFileMonitor(monitor_config) if levels_manager else None
+        print("✅ CSV monitor initialized successfully")
+    except Exception as e:
+        print(f"⚠️ Could not initialize CSV monitor: {e}")
+        csv_monitor = None
+else:
+    print("🔄 Running in simple mode - database features disabled")
 
 # Simple user class for authentication
 class User(UserMixin):
