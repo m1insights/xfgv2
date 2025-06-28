@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - xFG Trading System V2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        }
+        .card-bg {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-white flex items-center justify-center">
+    <div class="card-bg rounded-lg p-8 w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold mb-2">xFG Trading V2</h1>
+            <p class="text-gray-300">Structural Levels Management</p>
+        </div>
+        
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="mb-4">
+                    {% for message in messages %}
+                        <div class="bg-red-500 text-white p-3 rounded mb-2">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        <form method="POST" action="{{ url_for('login') }}">
+            <div class="mb-4">
+                <label for="username" class="block text-sm font-medium mb-2">Username</label>
+                <input type="text" 
+                       id="username" 
+                       name="username" 
+                       required 
+                       autofocus
+                       class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full focus:border-blue-500 focus:outline-none">
+            </div>
+            
+            <div class="mb-6">
+                <label for="password" class="block text-sm font-medium mb-2">Password</label>
+                <input type="password" 
+                       id="password" 
+                       name="password" 
+                       required
+                       class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full focus:border-blue-500 focus:outline-none">
+            </div>
+            
+            <button type="submit" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded w-full transition duration-200">
+                Login to Trading System
+            </button>
+        </form>
+        
+        <div class="mt-6 text-center text-sm text-gray-400">
+            <p>Default credentials: admin / password</p>
+        </div>
+    </div>
+</body>
+</html>

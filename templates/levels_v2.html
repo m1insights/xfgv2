@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Structural Levels V2 - xFG Trading</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        }
+        .card-bg {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .status-complete { @apply bg-green-500 text-white; }
+        .status-incomplete { @apply bg-red-500 text-white; }
+        .status-partial { @apply bg-yellow-500 text-black; }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-white">
+    <div x-data="levelsApp()" x-init="init()" class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">Structural Levels V2</h1>
+            <p class="text-gray-300">Trading Date: {{ today }} | Time: <span x-text="currentTime"></span> EST</p>
+            <div class="flex items-center space-x-4 mt-4">
+                <span class="px-3 py-1 rounded-full text-sm" 
+                      :class="isMarketHours ? 'bg-green-600' : 'bg-red-600'">
+                    <span x-text="isMarketHours ? 'Market Open' : 'Market Closed'"></span>
+                </span>
+                <span class="px-3 py-1 rounded-full text-sm" 
+                      :class="isTradingDay ? 'bg-blue-600' : 'bg-gray-600'">
+                    <span x-text="isTradingDay ? 'Trading Day' : 'Non-Trading Day'"></span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Status Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- ES Status -->
+            <div class="card-bg rounded-lg p-6">
+                <h2 class="text-2xl font-bold mb-4 text-yellow-400">ES Status</h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span>CSV Levels:</span>
+                        <span class="px-2 py-1 rounded text-xs" 
+                              :class="esStatus.csv_complete ? 'status-complete' : 'status-incomplete'">
+                            <span x-text="esStatus.csv_complete ? 'Complete' : 'Incomplete'"></span>
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Manual Levels:</span>
+                        <span class="px-2 py-1 rounded text-xs" 
+                              :class="esStatus.manual_complete ? 'status-complete' : 'status-incomplete'">
+                            <span x-text="esStatus.manual_complete ? 'Complete' : 'Incomplete'"></span>
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Overall:</span>
+                        <span class="px-2 py-1 rounded text-xs font-bold" 
+                              :class="esStatus.overall_complete ? 'status-complete' : 'status-incomplete'">
+                            <span x-text="esStatus.overall_complete ? 'Ready to Trade' : 'Not Ready'"></span>
+                        </span>
+                    </div>
+                    <div class="text-sm text-gray-400">
+                        <span x-text="esStatus.total_levels"></span> levels loaded
+                    </div>
+                </div>
+            </div>
+
+            <!-- NQ Status -->
+            <div class="card-bg rounded-lg p-6">
+                <h2 class="text-2xl font-bold mb-4 text-blue-400">NQ Status</h2>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span>CSV Levels:</span>
+                        <span class="px-2 py-1 rounded text-xs" 
+                              :class="nqStatus.csv_complete ? 'status-complete' : 'status-incomplete'">
+                            <span x-text="nqStatus.csv_complete ? 'Complete' : 'Incomplete'"></span>
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Manual Levels:</span>
+                        <span class="px-2 py-1 rounded text-xs" 
+                              :class="nqStatus.manual_complete ? 'status-complete' : 'status-incomplete'">
+                            <span x-text="nqStatus.manual_complete ? 'Complete' : 'Incomplete'"></span>
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span>Overall:</span>
+                        <span class="px-2 py-1 rounded text-xs font-bold" 
+                              :class="nqStatus.overall_complete ? 'status-complete' : 'status-incomplete'">
+                            <span x-text="nqStatus.overall_complete ? 'Ready to Trade' : 'Not Ready'"></span>
+                        </span>
+                    </div>
+                    <div class="text-sm text-gray-400">
+                        <span x-text="nqStatus.total_levels"></span> levels loaded
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Manual Level Entry -->
+        <div class="card-bg rounded-lg p-6 mb-8" x-show="pivotEntryTime || !isMarketHours">
+            <h2 class="text-2xl font-bold mb-4 text-green-400">Manual Level Entry</h2>
+            
+            <!-- Symbol Selection -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2">Symbol:</label>
+                <select x-model="selectedSymbol" 
+                        class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-32">
+                    <option value="ES">ES</option>
+                    <option value="NQ">NQ</option>
+                </select>
+            </div>
+
+            <!-- Pivot Levels Form -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Pivot</label>
+                    <input type="number" step="0.01" x-model="manualLevels.pivot"
+                           class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full"
+                           placeholder="5825.75">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Pivot High</label>
+                    <input type="number" step="0.01" x-model="manualLevels.pivot_high"
+                           class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full"
+                           placeholder="5850.25">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Pivot Low</label>
+                    <input type="number" step="0.01" x-model="manualLevels.pivot_low"
+                           class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full"
+                           placeholder="5800.50">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Pivot BA High</label>
+                    <input type="number" step="0.01" x-model="manualLevels.pivot_ba_high"
+                           class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full"
+                           placeholder="5875.00">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Pivot BA Low</label>
+                    <input type="number" step="0.01" x-model="manualLevels.pivot_ba_low"
+                           class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full"
+                           placeholder="5775.25">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Weekly Pivot</label>
+                    <input type="number" step="0.01" x-model="manualLevels.weekly_pivot"
+                           class="bg-gray-700 border border-gray-600 rounded px-3 py-2 w-full"
+                           placeholder="5800.00">
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex items-center space-x-4">
+                <button @click="submitManualLevels()" 
+                        :disabled="isSubmitting"
+                        class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-6 py-2 rounded font-medium">
+                    <span x-show="!isSubmitting">Submit Levels</span>
+                    <span x-show="isSubmitting">Submitting...</span>
+                </button>
+                <button @click="validateLevels()" 
+                        class="bg-green-600 hover:bg-green-700 px-6 py-2 rounded font-medium">
+                    Validate
+                </button>
+                <button @click="clearForm()" 
+                        class="bg-gray-600 hover:bg-gray-700 px-6 py-2 rounded font-medium">
+                    Clear
+                </button>
+            </div>
+
+            <!-- Validation Results -->
+            <div x-show="validationResult" class="mt-4 p-4 rounded" 
+                 :class="validationResult?.is_valid ? 'bg-green-900' : 'bg-red-900'">
+                <h4 class="font-bold mb-2">Validation Results:</h4>
+                <div x-show="validationResult?.errors?.length > 0" class="mb-2">
+                    <strong>Errors:</strong>
+                    <ul class="list-disc list-inside">
+                        <template x-for="error in validationResult.errors">
+                            <li x-text="error"></li>
+                        </template>
+                    </ul>
+                </div>
+                <div x-show="validationResult?.warnings?.length > 0">
+                    <strong>Warnings:</strong>
+                    <ul class="list-disc list-inside">
+                        <template x-for="warning in validationResult.warnings">
+                            <li x-text="warning"></li>
+                        </template>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Levels Display -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- ES Levels -->
+            <div class="card-bg rounded-lg p-6">
+                <h3 class="text-xl font-bold mb-4 text-yellow-400">ES Levels</h3>
+                <div class="space-y-2 text-sm">
+                    <template x-for="[levelType, price] in Object.entries(esLevels)" :key="levelType">
+                        <div class="flex justify-between">
+                            <span x-text="formatLevelName(levelType)" class="capitalize"></span>
+                            <span x-text="formatPrice(price)" class="font-mono"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- NQ Levels -->
+            <div class="card-bg rounded-lg p-6">
+                <h3 class="text-xl font-bold mb-4 text-blue-400">NQ Levels</h3>
+                <div class="space-y-2 text-sm">
+                    <template x-for="[levelType, price] in Object.entries(nqLevels)" :key="levelType">
+                        <div class="flex justify-between">
+                            <span x-text="formatLevelName(levelType)" class="capitalize"></span>
+                            <span x-text="formatPrice(price)" class="font-mono"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card-bg rounded-lg p-6">
+            <h3 class="text-xl font-bold mb-4">Actions</h3>
+            <div class="flex flex-wrap gap-4">
+                <button @click="refreshData()" 
+                        class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded">
+                    Refresh Data
+                </button>
+                <button @click="triggerCSVImport()" 
+                        class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded">
+                    Import CSV Files
+                </button>
+                <button @click="showScanReference()" 
+                        class="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded">
+                    Show Level Reference
+                </button>
+                <a href="/monitor" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded inline-block">
+                    Monitor Dashboard
+                </a>
+                <a href="/logout" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded inline-block">
+                    Logout
+                </a>
+            </div>
+        </div>
+
+        <!-- Messages -->
+        <div x-show="message" x-transition 
+             class="fixed bottom-4 right-4 p-4 rounded shadow-lg max-w-sm"
+             :class="messageType === 'success' ? 'bg-green-600' : 'bg-red-600'">
+            <p x-text="message"></p>
+        </div>
+    </div>
+
+    <script>
+        function levelsApp() {
+            return {
+                // State
+                selectedSymbol: 'ES',
+                manualLevels: {
+                    pivot: '',
+                    pivot_high: '',
+                    pivot_low: '',
+                    pivot_ba_high: '',
+                    pivot_ba_low: '',
+                    weekly_pivot: ''
+                },
+                esStatus: {{ es_status | tojson }},
+                nqStatus: {{ nq_status | tojson }},
+                esLevels: {{ es_levels | tojson }},
+                nqLevels: {{ nq_levels | tojson }},
+                currentTime: '{{ current_time.strftime("%H:%M:%S") }}',
+                isMarketHours: {{ is_market_hours | tojson }},
+                isTradingDay: {{ is_trading_day | tojson }},
+                pivotEntryTime: {{ pivot_entry_time | tojson }},
+                isSubmitting: false,
+                validationResult: null,
+                message: '',
+                messageType: 'success',
+
+                // Initialize
+                init() {
+                    // Update time every second
+                    setInterval(() => {
+                        const now = new Date();
+                        this.currentTime = now.toLocaleTimeString('en-US', {
+                            timeZone: 'America/New_York',
+                            hour12: false
+                        });
+                    }, 1000);
+                },
+
+                // Methods
+                async submitManualLevels() {
+                    if (this.isSubmitting) return;
+                    
+                    this.isSubmitting = true;
+                    
+                    try {
+                        // Filter out empty levels
+                        const levels = {};
+                        for (const [key, value] of Object.entries(this.manualLevels)) {
+                            if (value && value !== '') {
+                                levels[key] = parseFloat(value);
+                            }
+                        }
+                        
+                        if (Object.keys(levels).length === 0) {
+                            this.showMessage('Please enter at least one level', 'error');
+                            return;
+                        }
+                        
+                        const response = await fetch('/api/v2/manual-levels', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                symbol: this.selectedSymbol,
+                                trading_date: '{{ today }}',
+                                levels: levels
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            this.showMessage(`Successfully added ${result.imported_count} levels`, 'success');
+                            await this.refreshData();
+                            this.clearForm();
+                        } else {
+                            this.showMessage(result.error || 'Failed to add levels', 'error');
+                        }
+                        
+                    } catch (error) {
+                        this.showMessage('Error submitting levels: ' + error.message, 'error');
+                    } finally {
+                        this.isSubmitting = false;
+                    }
+                },
+
+                async validateLevels() {
+                    try {
+                        const response = await fetch('/api/v2/validate-levels', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                symbol: this.selectedSymbol,
+                                trading_date: '{{ today }}'
+                            })
+                        });
+                        
+                        const result = await response.json();
+                        this.validationResult = result;
+                        
+                    } catch (error) {
+                        this.showMessage('Error validating levels: ' + error.message, 'error');
+                    }
+                },
+
+                async refreshData() {
+                    try {
+                        // Refresh completeness status
+                        const [esResponse, nqResponse] = await Promise.all([
+                            fetch('/api/v2/completeness/ES?date={{ today }}'),
+                            fetch('/api/v2/completeness/NQ?date={{ today }}')
+                        ]);
+                        
+                        this.esStatus = await esResponse.json();
+                        this.nqStatus = await nqResponse.json();
+                        
+                        // Refresh levels
+                        const [esLevelsResponse, nqLevelsResponse] = await Promise.all([
+                            fetch('/api/v2/levels/ES/{{ today }}'),
+                            fetch('/api/v2/levels/NQ/{{ today }}')
+                        ]);
+                        
+                        const esLevelsData = await esLevelsResponse.json();
+                        const nqLevelsData = await nqLevelsResponse.json();
+                        
+                        this.esLevels = esLevelsData.levels || {};
+                        this.nqLevels = nqLevelsData.levels || {};
+                        
+                        this.showMessage('Data refreshed successfully', 'success');
+                        
+                    } catch (error) {
+                        this.showMessage('Error refreshing data: ' + error.message, 'error');
+                    }
+                },
+
+                async triggerCSVImport() {
+                    try {
+                        const response = await fetch('/api/v2/csv-import', {
+                            method: 'POST'
+                        });
+                        
+                        const result = await response.json();
+                        
+                        this.showMessage(`CSV Import: ${result.successful_count} successful, ${result.failed_count} failed`, 'success');
+                        
+                        if (result.successful_count > 0) {
+                            await this.refreshData();
+                        }
+                        
+                    } catch (error) {
+                        this.showMessage('Error importing CSV files: ' + error.message, 'error');
+                    }
+                },
+
+                clearForm() {
+                    this.manualLevels = {
+                        pivot: '',
+                        pivot_high: '',
+                        pivot_low: '',
+                        pivot_ba_high: '',
+                        pivot_ba_low: '',
+                        weekly_pivot: ''
+                    };
+                    this.validationResult = null;
+                },
+
+                formatLevelName(levelType) {
+                    return levelType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                },
+
+                formatPrice(price) {
+                    if (price === null || price === undefined) return 'N/A';
+                    return parseFloat(price).toFixed(2);
+                },
+
+                showMessage(text, type = 'success') {
+                    this.message = text;
+                    this.messageType = type;
+                    setTimeout(() => {
+                        this.message = '';
+                    }, 5000);
+                },
+
+                showScanReference() {
+                    // Open level reference documentation
+                    const referenceContent = `
+xFGv2 Level Scanning Reference
+
+📊 CSV LEVELS SCANNED (39 total):
+
+Week/Month: MGI Wk-Op, MGI MTH-Op
+Previous Session: MGI PM-Hi, MGI PM-Md, MGI PM-Lo, MGI PM-Cl, MGI PM-VAH, MGI PM-VAL
+Previous Week: MGI PW-Hi, MGI PW-Md, MGI PW-Lo, MGI PW-Cl, MGI PW-VAH, MGI PW-VAL
+VWAP: MGI mVWAP, MGI WVWAP, MGI: VWAP RTH
+Daily Reference: MGI: RTHO, MGI: PDH, MGI: PDM, MGI: PDL, MGI: PRTH Close
+Overnight ⭐: MGI: ONH, MGI: ONL, MGI: HGAP
+Initial Balance: MGI: IB+200%, MGI: IB+150%, MGI: IB+100%, MGI: IB+50%, MGI: IBH, MGI: IBM, MGI: IBL, MGI: IB-50%, MGI: IB-100%, MGI: IB-150%, MGI: IB-200%
+Balance Area: Balance Area High, Balance Area Mid, Balance Area Low
+
+✋ MANUAL LEVELS REQUIRED:
+pivot, pivot_high, pivot_low, pivot_ba_high, pivot_ba_low, weekly_pivot (Mondays)
+
+📁 FILE NAMING:
+ES: ES_levels.csv, NQ: NQ_levels.csv
+
+⏰ TIMING:
+CSV must contain data from 9:30 AM EST or later (when ONH/ONL are final)
+
+💡 WORKFLOW:
+1. Export ES & NQ CSV files from MotiveWave after 9:30 AM
+2. Save to CSV watch folder
+3. System auto-imports MGI levels
+4. Enter pivot levels via this web interface
+5. Trade when both symbols show "Complete"
+                    `;
+                    
+                    // Create a popup or alert with the reference
+                    alert(referenceContent);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

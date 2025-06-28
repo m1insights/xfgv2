@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: xfgv2
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python web_app_levels_v2.py
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        value: 5002
+      - key: DATABASE_URL
+        sync: false
+      - key: RITHMIC_USERNAME
+        sync: false
+      - key: RITHMIC_PASSWORD
+        sync: false
+      - key: RITHMIC_SYSTEM_NAME
+        sync: false
+      - key: RITHMIC_URI
+        sync: false
+      - key: RITHMIC_ENVIRONMENT
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_PHONE
+        sync: false
+      - key: TWILIO_TO_PHONE
+        sync: false
