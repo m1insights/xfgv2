@@ -9,7 +9,7 @@ flask-login==0.6.3
 twilio==8.11.0
 
 # Database
-sqlalchemy==2.0.23
+sqlalchemy==2.0.36
 psycopg2-binary==2.9.7
 
 # Utilities
